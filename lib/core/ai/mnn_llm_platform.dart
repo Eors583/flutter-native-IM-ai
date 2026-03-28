@@ -2,13 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
-/// Android 端 MethodChannel + EventChannel，对接 `MnnLlmPlugin` / JNI / MNN 3.4.1。
+/// Android：`MnnLlmPlugin` + JNI；iOS：`MnnLlmPlugin.swift`，通道名一致。
 class MnnLlmPlatform {
   MnnLlmPlatform._();
   static const MethodChannel _channel = MethodChannel('aiim/mnn_llm');
   static const EventChannel _eventChannel = EventChannel('aiim/mnn_llm_stream');
 
-  static bool get supported => Platform.isAndroid;
+  static bool get supported => Platform.isAndroid || Platform.isIOS;
 
   static Future<bool> probe() async {
     if (!supported) return false;

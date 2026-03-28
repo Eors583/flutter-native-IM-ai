@@ -1,9 +1,21 @@
 # android-native-IM-ai
 
-一个安卓原生（Kotlin + Jetpack Compose）的 **局域网 IM 聊天 + 端侧离线 AI 问答** 示例项目。
+一个 **局域网 IM 聊天 + 端侧离线 AI 问答** 示例项目：包含 **Android 原生**（Kotlin + Jetpack Compose）与 **Flutter 跨端客户端**（`lib/`、`ios/`），两端共享相近的 IM 与 MNN 端侧能力。
 
 - **局域网 IM**：同一 Wi‑Fi 下点对点 TCP Socket 通信（设备 A 当服务器，设备 B 连接 IP）。
-- **端侧 AI（MNN LLM）**：模型不随 APK 打包，首次由用户从云存储下载到本地，之后离线问答；支持模型选择、下载确认与进度提示；内置“温柔女孩”人设（soul）。
+- **端侧 AI（MNN LLM）**：模型不随应用包提供，首次由用户从云存储下载到本地，之后离线问答；支持模型选择、下载确认与进度提示；内置“温柔女孩”人设（soul）。
+
+## 克隆后必看：`.gitignore` 与功能对应关系
+
+以下路径**刻意不入库**（体积、密钥或可由脚本生成）。缺失时会导致对应能力不可用，请按后文各节在本机补齐。
+
+| 忽略项 | 影响 |
+|--------|------|
+| `third_party/MNN/` | **Android JNI 编译**与 **iOS 本地编 MNN.xcframework** 都需要 MNN 源码/头文件树；缺失则无法完成带端侧 MNN 的原生构建。 |
+| `ios/Frameworks/MNN.xcframework/` | **iOS 端侧 MNN** 链接失败或 Xcode「Check MNN.xcframework」阶段报错；需本地构建后放入（见下文）。 |
+| `android/.../jniLibs/**/*.so` | **Android** 若未通过 Gradle 自动下载 MNN 预编译库，则端侧推理不可用，需手动放置 `.so`。 |
+| `tools/pc-ai-server/.env` | 仅影响 **PC AI 桥接**（Ollama/OpenAI）；复制 `.env.example` 为 `.env` 即可，与端侧 MNN 无关。 |
+| `ios/Pods/`（由 `ios/.gitignore` 忽略） | 克隆后需在 `ios/` 下执行 **`pod install`**，否则无法打开 Workspace 或编译 iOS。 |
 
 ## 克隆后必做：MNN 头文件目录 `third_party/MNN`
 
@@ -39,6 +51,22 @@ cd ../..
 ### 预编译 `.so`（同样未入库）
 
 `android/app/src/main/jniLibs/arm64-v8a/` 下的 **`libMNN.so` 等预编译库默认也不提交**。首次构建 Android 时，`android/app/build.gradle.kts` 中的 Gradle 任务会尝试从网络下载 MNN 发行包并拷贝到 `jniLibs`；若下载失败，需自行按该文件中的说明准备 `.so`。
+
+### iOS：`MNN.xcframework`（未入库）
+
+**`ios/Frameworks/MNN.xcframework/` 被忽略**，体积大且需与本地 Xcode 工具链一致编译。没有它则 **iOS 端侧 MNN 无法链接/编译**（工程内已配置链接该 XCFramework）。
+
+1. 先按上文准备好 **`third_party/MNN/`**（完整源码树，不仅是 sparse 头文件；构建脚本需要 `CMakeLists.txt` 等）。
+2. 在仓库根目录执行：
+
+```bash
+bash tools/build_mnn_ios.sh
+```
+
+3. 将生成的 **`MNN.xcframework`** 放到 **`ios/Frameworks/`**（与 `ios/Frameworks/PLACE_MNN_FRAMEWORK_HERE.txt` 说明一致）。
+4. 在 **`ios/`** 目录执行 **`pod install`**，用 **`ios/Runner.xcworkspace`** 打开工程；Flutter 侧可用 `flutter run -d ios`。
+
+若仅需跳过本地检查（例如尚未放入 framework），可在 Xcode 构建环境变量中设置 **`AIIM_SKIP_MNN_CHECK=1`**（仍无法在缺少库的情况下真正链接成功）。
 
 ## 项目特性
 

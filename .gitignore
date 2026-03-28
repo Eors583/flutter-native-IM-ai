@@ -50,6 +50,11 @@ tools/pc-ai-server/.env
 # MNN 完整源码树（体积大；用 tools/setup_mnn_headers.ps1 克隆到本地，勿进仓库）
 /third_party/MNN/
 
+# iOS：本地编译的 MNN.xcframework（见 tools/build_mnn_ios.sh）
+/ios/Frameworks/MNN.xcframework/
+# 旧版单 slice 的 MNN.framework（若仍存在，勿入库）
+/ios/Frameworks/MNN.framework/
+
 # MNN 预编译 .so（构建时由 Gradle 下载；亦可手动放入 jniLibs/arm64-v8a）
 /android/app/src/main/jniLibs/**/*.so
 /android/app/src/main/jniLibs/**/.mnn_3.4.1_ok

@@ -82,9 +82,10 @@ class _AiChatPageState extends State<AiChatPage> {
   late final VoidCallback _onMnnChanged;
 
   static const String _stubAssistantReply =
-      '当前版本还没有在 App 里接上端侧 MNN 原生推理，所以无法在手机上直接跑已下载的模型。\n\n'
-      '模型文件可以先下好，等原生引擎接入后即可离线问答。\n\n'
-      '如果要在局域网里先试用大模型对话，请到「首页」连接电脑上的 PC AI 服务（仓库里 tools/pc-ai-server）。';
+      '当前本机尚未接通端侧 MNN 原生推理（Android 需 JNI 库；iOS 需在 AppDelegate 注入 `MnnLlmEngineBridge.backend`），'
+      '所以无法在设备上直接跑已下载的模型。\n\n'
+      '模型可先下好，接好原生引擎后即可离线问答。\n\n'
+      '若要在局域网里先试用大模型对话，请到「首页」连接电脑上的 PC AI 服务（仓库里 tools/pc-ai-server）。';
 
   @override
   void initState() {
@@ -111,15 +112,18 @@ class _AiChatPageState extends State<AiChatPage> {
       return '端侧 MNN：首次需联网下载模型。\n'
           '尚未下载当前模型，请先点「切换模型」并确认下载。';
     }
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       return '端侧 MNN：当前模型文件已就绪。\n'
-          '本机为 ${Platform.operatingSystem}，端侧对话仅在 Android（arm64）上启用；'
+          '本机为 ${Platform.operatingSystem}，端侧对话仅在 Android / iOS 上启用；'
           '此处发送将显示说明。';
     }
     if (!llm.nativeProbeComplete) {
       return '端侧 MNN：正在检测原生引擎…';
     }
     if (!llm.isNativeBackendAvailable) {
+      if (Platform.isIOS) {
+        return '端侧 MNN：模型已下载，但原生引擎未就绪（请确认已安装 ios/Frameworks/MNN.framework，见 ios/Frameworks/PLACE_MNN_FRAMEWORK_HERE.txt）。';
+      }
       return '端侧 MNN：模型已下载，但未能加载 JNI 库（请用 flutter build apk / 真机安装完整构建）。';
     }
     if (mnn.isBusy) {
@@ -128,18 +132,35 @@ class _AiChatPageState extends State<AiChatPage> {
     if (!llm.isSessionReady) {
       return '端侧 MNN：模型已下载，正在加载推理会话…（若失败请看下方橙色提示）';
     }
-    return '端侧 MNN：模型与引擎已就绪，可直接在下方输入问题（离线）。\n'
-        '需 ARM64 真机；x86 模拟器不包含 arm64-v8a 预置库。';
+    if (Platform.isAndroid) {
+      return '端侧 MNN：模型与引擎已就绪，可直接在下方输入问题（离线）。\n'
+          'Android 建议 ARM64 真机；x86 模拟器不包含 arm64-v8a 预置库。';
+    }
+    return '端侧 MNN：模型与引擎已就绪，可直接在下方输入问题（离线）。';
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+  /// 滚到列表底部。[snap] 为 true 时立即跳转（流式输出时避免动画追不上内容高度）。
+  void _scrollToLatest({bool snap = false}) {
+    void scrollOnce() {
       if (!_scrollCtrl.hasClients) return;
-      _scrollCtrl.animateTo(
-        _scrollCtrl.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
+      final max = _scrollCtrl.position.maxScrollExtent;
+      if (snap) {
+        _scrollCtrl.jumpTo(max);
+      } else {
+        _scrollCtrl.animateTo(
+          max,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+
+    // 连续两帧：第一帧 ListView 可能尚未按新文本完成布局，第二帧再对齐真实 maxScrollExtent。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scrollOnce();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scrollOnce();
+      });
     });
   }
 
@@ -253,7 +274,7 @@ class _AiChatPageState extends State<AiChatPage> {
       } else if (s.isModelReady) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('模型下载完成。Android 将自动加载端侧引擎，可在此页对话。'),
+            content: Text('模型下载完成。系统将尝试加载端侧引擎，可在此页对话。'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -270,7 +291,7 @@ class _AiChatPageState extends State<AiChatPage> {
 
     final llm = context.read<MnnLocalLlmController>();
     final useNative =
-        Platform.isAndroid &&
+        (Platform.isAndroid || Platform.isIOS) &&
         llm.isNativeBackendAvailable &&
         llm.isSessionReady;
 
@@ -281,7 +302,7 @@ class _AiChatPageState extends State<AiChatPage> {
         _messages.add(_AiChatTurn.assistant(''));
         _inputCtrl.clear();
       });
-      _scrollToBottom();
+      _scrollToLatest();
       final thinkingIndex = _messages.length - 2;
       final assistantIndex = _messages.length - 1;
       var replyIndex = assistantIndex;
@@ -317,7 +338,7 @@ class _AiChatPageState extends State<AiChatPage> {
               _messages[replyIndex].text = after;
             });
           }
-          _scrollToBottom();
+          _scrollToLatest(snap: true);
         }
         if (!mounted) return;
         if (tagStart == null) {
@@ -352,7 +373,7 @@ class _AiChatPageState extends State<AiChatPage> {
           }
         });
       }
-      _scrollToBottom();
+      _scrollToLatest();
       return;
     }
 
@@ -361,7 +382,7 @@ class _AiChatPageState extends State<AiChatPage> {
       _messages.add(_AiChatTurn.assistant(_stubAssistantReply));
       _inputCtrl.clear();
     });
-    _scrollToBottom();
+    _scrollToLatest();
   }
 
   @override
@@ -371,8 +392,9 @@ class _AiChatPageState extends State<AiChatPage> {
     final title =
         findMnnModel(mnn.selectedModelId)?.title ?? mnn.selectedModelId;
 
+    final mnnMobile = Platform.isAndroid || Platform.isIOS;
     final nativeOk =
-        Platform.isAndroid &&
+        mnnMobile &&
         llm.isNativeBackendAvailable &&
         llm.isSessionReady;
     final canSend =
@@ -380,14 +402,14 @@ class _AiChatPageState extends State<AiChatPage> {
         !mnn.isBusy &&
         !llm.isGenerating &&
         _inputCtrl.text.trim().isNotEmpty &&
-        (nativeOk || !Platform.isAndroid);
+        (nativeOk || !mnnMobile);
 
     final canSendStub =
         mnn.isModelReady &&
         !mnn.isBusy &&
         !llm.isGenerating &&
         _inputCtrl.text.trim().isNotEmpty &&
-        Platform.isAndroid &&
+        mnnMobile &&
         !nativeOk;
 
     return Scaffold(
@@ -513,9 +535,10 @@ class _AiChatPageState extends State<AiChatPage> {
                         alignment: Alignment.center,
                         child: Text(
                           mnn.isModelReady
-                              ? (Platform.isAndroid && llm.isSessionReady
+                              ? ((Platform.isAndroid || Platform.isIOS) &&
+                                      llm.isSessionReady
                                   ? '模型与端侧引擎已就绪，可直接对话。'
-                                  : '模型已就绪。Android 将加载 MNN 引擎；其他平台暂为说明回复。')
+                                  : '模型已就绪。Android / iOS 将尝试加载端侧引擎；其他平台暂为说明回复。')
                               : '下载并就绪模型后，可在此发送消息。',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -524,14 +547,20 @@ class _AiChatPageState extends State<AiChatPage> {
                           ),
                         ),
                       )
-                      : ListView.builder(
+                      : Scrollbar(
                         controller: _scrollCtrl,
-                        padding: const EdgeInsets.only(top: 8, bottom: 8),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, i) {
-                          final m = _messages[i];
-                          return _ChatBubble(turn: m);
-                        },
+                        thumbVisibility: llm.isGenerating,
+                        thickness: 6,
+                        radius: const Radius.circular(4),
+                        child: ListView.builder(
+                          controller: _scrollCtrl,
+                          padding: const EdgeInsets.only(top: 8, bottom: 8),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, i) {
+                            final m = _messages[i];
+                            return _ChatBubble(turn: m);
+                          },
+                        ),
                       ),
             ),
             Row(
@@ -544,7 +573,7 @@ class _AiChatPageState extends State<AiChatPage> {
                           mnn.isModelReady
                               ? (nativeOk
                                   ? '输入你的问题（端侧 MNN）…'
-                                  : (Platform.isAndroid
+                                  : ((Platform.isAndroid || Platform.isIOS)
                                       ? '等待引擎加载完成，或先查看说明回复…'
                                       : '当前平台端侧推理未实现，将显示说明…'))
                               : '请先就绪模型后再输入…',

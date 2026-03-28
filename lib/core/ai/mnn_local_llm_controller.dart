@@ -1,9 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import 'mnn_llm_platform.dart';
 import 'mnn_model_store.dart';
 
-/// 管理端侧 MNN 会话加载与生成（当前仅 Android JNI）。
+/// 管理端侧 MNN 会话加载与生成（Android JNI / iOS 原生桥接）。
 class MnnLocalLlmController extends ChangeNotifier {
   bool? _nativeProbe;
   bool _sessionReady = false;
@@ -17,20 +19,26 @@ class MnnLocalLlmController extends ChangeNotifier {
   bool get isGenerating => _generating;
   String? get lastError => _lastError;
 
-  /// 检测 so 是否可加载（仅 Android）。
+  /// 检测原生后端是否可用（Android：JNI；iOS：`MnnLlmEngineBridge.backend`）。
   Future<void> warmUpProbe() async {
     if (!MnnLlmPlatform.supported) {
       _nativeProbe = false;
-      _lastError = '当前平台不支持端侧 MNN（仅 Android）。';
+      _lastError = '当前平台不支持端侧 MNN（需 Android 或 iOS）。';
       notifyListeners();
       return;
     }
     try {
       _nativeProbe = await MnnLlmPlatform.probe();
       if (_nativeProbe == false) {
-        _lastError =
-            '未能加载 libaiim_mnn_jni.so。常见原因：① 使用 x86/x86_64 模拟器（本工程仅打包 arm64-v8a，请用 ARM64 真机或带 ARM 翻译的模拟器）；'
-            '② 未完整构建（需 third_party/MNN 头文件 + Gradle 能下载 jniLibs 中的 MNN .so）；③ 安装包过旧，请 flutter clean 后重装。';
+        if (Platform.isIOS) {
+          _lastError =
+              'iOS 端 MNN 未就绪：请确认已按 ios/Frameworks/PLACE_MNN_FRAMEWORK_HERE.txt 编译并放入 MNN.framework；'
+              '若使用自定义引擎，可实现 `MnnLlmFlutterBackend` 并设置 `MnnLlmEngineBridge.backend`。';
+        } else {
+          _lastError =
+              '未能加载 libaiim_mnn_jni.so。常见原因：① 使用 x86/x86_64 模拟器（本工程仅打包 arm64-v8a，请用 ARM64 真机或带 ARM 翻译的模拟器）；'
+              '② 未完整构建（需 third_party/MNN 头文件 + Gradle 能下载 jniLibs 中的 MNN .so）；③ 安装包过旧，请 flutter clean 后重装。';
+        }
       } else {
         _lastError = null;
       }

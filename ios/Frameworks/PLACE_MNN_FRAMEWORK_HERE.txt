@@ -1,0 +1,23 @@
+本目录需存在 MNN.xcframework（真机 + 模拟器双架构，带 MNN_BUILD_LLM），否则 Xcode 会在「Check MNN.xcframework」阶段失败。
+
+步骤概要（与 Android 使用同一套 MNN 3.4.1 + Transformer LLM）：
+
+1) 克隆 MNN（勿提交进 Git；可与 README 中 third_party/MNN 说明一致）：
+   mkdir -p ../../third_party
+   git clone --depth 1 -b 3.4.1 https://github.com/alibaba/MNN.git ../../third_party/MNN
+
+2) 在本仓库根目录执行（需 macOS、Xcode、CMake）：
+   bash tools/build_mnn_ios.sh
+
+3) 成功后应出现：
+   ios/Frameworks/MNN.xcframework
+
+4) 模型文件仍由 App 内「切换模型」下载到应用沙盒（与 Android 相同 OSS 布局），无需放进 Framework。
+
+可选：若你有自研 MNN 封装，可实现 MnnLlmFlutterBackend 并在 AppDelegate 里设置 MnnLlmEngineBridge.backend，将覆盖默认 AiimMnnLlmEngine。
+
+仅调试其它功能、暂不编 MNN 时，可在 Xcode 的 Build Phase 环境变量里设 AIIM_SKIP_MNN_CHECK=1 跳过检查（仍会链接失败，除非有 framework）。
+
+官方说明见 MNN 仓库：
+transformers/llm/engine/ios/README.md
+transformers/README.md（iOS 编译宏）
