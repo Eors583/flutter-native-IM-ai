@@ -5,6 +5,30 @@
 - **局域网 IM**：同一 Wi‑Fi 下点对点 TCP Socket 通信（设备 A 当服务器，设备 B 连接 IP）。
 - **端侧 AI（MNN LLM）**：模型不随应用包提供，首次由用户从云存储下载到本地，之后离线问答；支持模型选择、下载确认与进度提示；内置“温柔女孩”人设（soul）。
 
+## 界面预览
+
+以下为客户端主要界面截图，源文件在仓库 [`readme-pic/`](readme-pic/) 目录。
+
+### 首页
+
+![首页](readme-pic/home.jpg)
+
+### 聊天室
+
+![聊天室](readme-pic/chatroom.jpg)
+
+### AI 聊天
+
+![AI 聊天](readme-pic/aichat.jpg)
+
+### 我的
+
+![我的](readme-pic/me.jpg)
+
+### 编辑资料
+
+![编辑资料](readme-pic/editme.jpg)
+
 ## 克隆后必看：`.gitignore` 与功能对应关系
 
 以下路径**刻意不入库**（体积、密钥或可由脚本生成）。缺失时会导致对应能力不可用，请按后文各节在本机补齐。
