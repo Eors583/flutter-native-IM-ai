@@ -21,13 +21,22 @@ class MnnLocalLlmController extends ChangeNotifier {
   Future<void> warmUpProbe() async {
     if (!MnnLlmPlatform.supported) {
       _nativeProbe = false;
+      _lastError = '当前平台不支持端侧 MNN（仅 Android）。';
       notifyListeners();
       return;
     }
     try {
       _nativeProbe = await MnnLlmPlatform.probe();
-    } catch (_) {
+      if (_nativeProbe == false) {
+        _lastError =
+            '未能加载 libaiim_mnn_jni.so。常见原因：① 使用 x86/x86_64 模拟器（本工程仅打包 arm64-v8a，请用 ARM64 真机或带 ARM 翻译的模拟器）；'
+            '② 未完整构建（需 third_party/MNN 头文件 + Gradle 能下载 jniLibs 中的 MNN .so）；③ 安装包过旧，请 flutter clean 后重装。';
+      } else {
+        _lastError = null;
+      }
+    } catch (e) {
       _nativeProbe = false;
+      _lastError = e.toString();
     }
     notifyListeners();
   }
@@ -39,7 +48,8 @@ class MnnLocalLlmController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (_nativeProbe == null) {
+    // 首次为 null 要探测；曾为 false 也再探测一次（避免引擎/插件晚于首次 probe 就绪后永久卡住）
+    if (_nativeProbe != true) {
       await warmUpProbe();
     }
     if (_nativeProbe != true) return;
